@@ -19,11 +19,11 @@ Snapshot::save(OutputArchive archive,
                entt::registry const& reg,
                ShouldSerializePred should_serialize)
 {
-  auto sz = reg.size();
+  auto sz = reg.storage<entt::entity>()->size();
 
   archive(cereal::make_nvp("e_count", sz));
 
-  for (auto it = reg.data(), last = it + sz; it != last; ++it) {
+  for (auto it = reg.storage<entt::entity>()->data(), last = it + sz; it != last; ++it) {
     auto h = entt::const_handle{ reg, *it };
     saveHandle(archive, h, should_serialize);
   }
@@ -40,9 +40,8 @@ Snapshot::saveHandle(OutputArchive& archive,
     detail::SerializeHandleEntity{ .e = e,
                                    .components = std::vector<Handle>{} };
 
-  h.visit([&e_serial, &h, &should_serialize](
-            entt::id_type type_id,
-            entt::basic_sparse_set<entt::entity> const& storage) {
+  for(auto [type_id, storage] : h.storage())
+  {
     auto refl_comp = ComponentReflection{ storage.type() };
     if (refl_comp) {
 
@@ -51,7 +50,7 @@ Snapshot::saveHandle(OutputArchive& archive,
         e_serial.components.push_back(Handle{ refl_comp.get(h) });
       }
     }
-  });
+  }
 
   auto label = std::to_string((size_t)e);
   archive(cereal::make_nvp(label, e_serial));
